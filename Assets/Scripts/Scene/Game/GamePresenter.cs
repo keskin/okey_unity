@@ -1,25 +1,67 @@
 ﻿using Networking;
+using System;
+using System.Net.WebSockets;
 using Service;
-using GameLogic;
 
 namespace Scene.Game
 {
-    public class GamePresenter
+    public class GamePresenter : IDisposable
     {
-        private readonly IAssetManager _assetManager;
-        private readonly IWebSocketNetworking _webSocketNetworking;
-        private readonly SmartBot _smartBot;
+        private const string GameConnectionId = "game";
+        public event Action<string> OnNewMessage;
+        
+        private readonly IWebSocketService _webSocketService;
+        private IWebSocketConnection _gameConnection;
+        private readonly ILogger _logger;
 
-        public GamePresenter(IAssetManager assetManager, IWebSocketNetworking webSocketNetworking, SmartBot smartBot)
+        public GamePresenter(IWebSocketService webSocketService, ILogger logger)
         {
-            _assetManager = assetManager;
-            _webSocketNetworking = webSocketNetworking;
-            _smartBot = smartBot;
+            _webSocketService = webSocketService;
+            _logger = logger;
+            InitializeConnectionListener();
         }
 
-        public void InitializeGame()
+        private void InitializeConnectionListener()
         {
-            _smartBot.CalculateNextMove();
+            _gameConnection = _webSocketService.GetOrCreateConnection(GameConnectionId);
+
+            if (_gameConnection.Status != ConnectionStatus.Connected)
+            {
+                _logger.LogError("GamePresenter: Bağlantı hazır değil! Durum: " + _gameConnection.Status);
+                return;
+            }
+            
+            _logger.Log("GamePresenter: Bağlantı hazır. Event'lere abone olunuyor.");
+            _gameConnection.OnConnected += OnConnected;
+            _gameConnection.OnDisconnected += OnDisconnected;
+            _gameConnection.OnMessageReceived += OnGameMessageReceived;
+
+            _gameConnection.ProcessPendingMessages();
+        }
+
+        private void OnGameMessageReceived(string message)
+        {
+            OnNewMessage?.Invoke($"Sunucudan mesaj: {message}");
+        }
+        
+        private void OnConnected()
+        {
+            _logger.Log("[GamePresenter] Bağlantı kuruldu/yenilendi.");
+        }
+        
+        private void OnDisconnected(WebSocketCloseStatus closeStatus)
+        {
+            _logger.LogWarning($"[GamePresenter] Bağlantı koptu. Durum: {closeStatus}");
+        }
+
+        public void Dispose()
+        {
+            if (_gameConnection != null)
+            {
+                _gameConnection.OnConnected -= OnConnected;
+                _gameConnection.OnDisconnected -= OnDisconnected;
+                _gameConnection.OnMessageReceived -= OnGameMessageReceived;
+            }
         }
     }
 }

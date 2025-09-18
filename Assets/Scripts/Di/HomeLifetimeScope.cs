@@ -9,7 +9,7 @@ namespace Di
         protected override void Configure(IContainerBuilder builder)
         {
             builder.RegisterComponentInHierarchy<HomeView>().As<IHomeView>();
-            builder.Register<HomePresenter>(Lifetime.Scoped);
+            builder.Register<HomePresenter>(Lifetime.Scoped).AsImplementedInterfaces().AsSelf();
         }
     }
 }
