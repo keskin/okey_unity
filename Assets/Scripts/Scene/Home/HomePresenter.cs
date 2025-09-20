@@ -28,27 +28,37 @@ namespace Scene.Home
         {
             if (_isConnecting) return;
 
-            _isConnecting = true;
-            _logger.Log("Bağlantı işlemi başlatılıyor...");
-
-            _gameConnection = _webSocketService.GetOrCreateConnection(GameConnectionId);
-            _gameConnection.OnConnected += OnConnected;
-            _gameConnection.OnDisconnected += OnDisconnected;
-
-            bool success = await _gameConnection.ConnectAsync(ServerAddress, PlayerId);
-
-            if (success)
+            try
             {
-                _logger.Log("Bağlantı başarılı. GameScene yükleniyor.");
-                await _navigationService.LoadSceneAsync("GameScene");
+                _isConnecting = true;
+                _logger.Log("Bağlantı işlemi başlatılıyor...");
+
+                _gameConnection = _webSocketService.GetOrCreateConnection(GameConnectionId);
+                _gameConnection.OnConnected += OnConnected;
+                _gameConnection.OnDisconnected += OnDisconnected;
+
+                bool success = await _gameConnection.ConnectAsync(ServerAddress, PlayerId);
+
+                if (success)
+                {
+                    _logger.Log("Bağlantı başarılı. GameScene yükleniyor.");
+                    await _navigationService.LoadSceneAsync("GameScene");
+                }
+                else
+                {
+                    _logger.LogError("Bağlantı kurulamadı. Lütfen sunucunun çalıştığından emin olun.");
+                    Dispose();
+                }
             }
-            else
+            catch (Exception e)
             {
-                _logger.LogError("Bağlantı kurulamadı. Lütfen sunucunun çalıştığından emin olun.");
-                // Burada UI üzerinde bir hata mesajı göstermek için bir event tetiklenebilir.
-                Dispose(); // Başarısız bağlantı sonrası event aboneliklerini temizle
+                _logger.LogError($"Bağlantı sırasında beklenmedik bir hata oluştu: {e.Message}");
+                Dispose();
             }
-            _isConnecting = false;
+            finally
+            {
+                _isConnecting = false;
+            }
         }
 
         private void OnConnected()
@@ -71,3 +81,4 @@ namespace Scene.Home
         }
     }
 }
+
